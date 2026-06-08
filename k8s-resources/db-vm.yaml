@@ -1,0 +1,56 @@
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: postgres-db-vm
+  namespace: demo-gitops
+  labels:
+    app: postgres-db
+spec:
+  running: true
+  template:
+    metadata:
+      labels:
+        kubevirt.io/domain: postgres-db-vm
+        app: postgres-db
+    spec:
+      domain:
+        cpu:
+          cores: 4
+        memory:
+          guest: 8Gi
+        devices:
+          disks:
+            - name: bootdisk
+              disk:
+                bus: virtio
+            - name: cloudinitvolume
+              disk:
+                bus: virtio
+          interfaces:
+            - name: default
+              masquerade: {}
+        resources:
+          requests:
+            memory: 8Gi
+      networks:
+        - name: default
+          pod: {}
+      volumes:
+        - name: bootdisk
+          containerDisk:
+            image: 'quay.io/containerdisks/centos-stream:9'
+        - name: cloudinitvolume
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              user: admin
+              password: SecretPassword123
+              chpasswd: { expire: False }
+              ssh_pwauth: True
+              runcmd:
+                - dnf install -y postgresql-server postgresql
+                - postgresql-setup --initdb
+                - echo "host all all 0.0.0.0/0 md5" >> /var/lib/pgsql/data/pg_hba.conf
+                - echo "listen_addresses='*'" >> /var/lib/pgsql/data/postgresql.conf
+                - systemctl enable --now postgresql
+                - sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'SecretPassword123';"
