@@ -66,7 +66,12 @@ spec:
               runcmd:
                 - dnf install -y postgresql-server postgresql-contrib
                 - postgresql-setup --initdb
+                # --- FIXED: CONFIGURE POSTGRES NETWORK SECURITY CONFIGS ---
                 - sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/g" /var/lib/pgsql/data/postgresql.conf
-                - echo "host all all 0.0.0.0/0 md5" >> /var/lib/pgsql/data/pg_hba.conf
+                # Allow clear text password authentication (md5/scram-sha-256) from the SDN subnet array
+                - echo "host all all 0.0.0.0/0 scram-sha-256" > /var/lib/pgsql/data/pg_hba.conf
+                - echo "local all all trust" >> /var/lib/pgsql/data/pg_hba.conf
                 - systemctl enable --now postgresql
+                # --- FIXED: SET INTERNAL DATABASE USER PASSWORD EXPRESSLY ---
+                - runuser -l postgres -c "psql -c \"ALTER USER postgres WITH PASSWORD 'LiveSecretPassword123';\""
           name: cloudinitdisk
