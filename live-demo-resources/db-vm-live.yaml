@@ -1,0 +1,72 @@
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: postgres-db-live
+  namespace: demo-gitops
+  labels:
+    app: postgres-db-live
+spec:
+  runStrategy: Always 
+  dataVolumeTemplates:
+    - apiVersion: cdi.kubevirt.io/v1beta1
+      kind: DataVolume
+      metadata:
+        name: postgres-db-live-disk
+      spec:
+        sourceRef:
+          kind: DataSource
+          name: centos-stream9
+          namespace: openshift-virtualization-os-images
+        storage:
+          resources:
+            requests:
+              storage: 30Gi
+  template:
+    metadata:
+      labels:
+        kubevirt.io/domain: postgres-db-live
+        vm.kubevirt.io/name: postgres-db-live
+    spec:
+      architecture: amd64
+      domain:
+        cpu:
+          cores: 1
+          sockets: 1
+          threads: 1
+        devices:
+          disks:
+            - disk:
+                bus: virtio
+              name: rootdisk
+            - disk:
+                bus: virtio
+              name: cloudinitdisk
+          interfaces:
+            - masquerade: {}
+              model: virtio
+              name: default
+        memory:
+          guest: 4Gi
+      networks:
+        - name: default
+          pod: {}
+      terminationGracePeriodSeconds: 180
+      volumes:
+        - dataVolume:
+            name: postgres-db-live-disk
+          name: rootdisk
+        - cloudInitNoCloud:
+            userData: |-
+              #cloud-config
+              user: centos
+              password: LiveSecretPassword123
+              chpasswd: { expire: False }
+              ssh_authorized_keys:
+                - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAdLawGOChO3+pn1qb0r7k2dPXJ+bqw+6tdYvOiGuPJS jmaira@jmaira-mac"
+              runcmd:
+                - dnf install -y postgresql-server postgresql-contrib
+                - postgresql-setup --initdb
+                - sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/g" /var/lib/pgsql/data/postgresql.conf
+                - echo "host all all 0.0.0.0/0 md5" >> /var/lib/pgsql/data/pg_hba.conf
+                - systemctl enable --now postgresql
+          name: cloudinitdisk

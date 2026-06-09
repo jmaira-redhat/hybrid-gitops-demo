@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service-live
+  namespace: demo-gitops
+spec:
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+  selector:
+    vm.kubevirt.io/name: postgres-db-live
+  type: ClusterIP
